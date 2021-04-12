@@ -74,13 +74,25 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	private static final int SUPPRESSED_EXCEPTIONS_LIMIT = 100;
 
 
-	/** Cache of singleton objects: bean name to bean instance. */
+	/** Cache of singleton objects: bean name to bean instance.
+	 * 表示已经经历了完整生命周期的Bean对象
+	 * 第一级缓存
+	 * */
 	private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
 
-	/** Cache of singleton factories: bean name to ObjectFactory. */
+	/** Cache of singleton factories: bean name to ObjectFactory.
+	 * 单例工厂的高速缓存：bean名称--ObjectFactory
+	 * 表示存放生成bean的工厂
+	 * 第三级缓存
+	 * */
 	private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
 
-	/** Cache of early singleton objects: bean name to bean instance. */
+	/** Cache of early singleton objects: bean name to bean instance.
+	 * 早期的单例对象的高速缓存：bean名称--bean实例
+	 * 表示Bean的生命周期还没走完（Bean的属性还未填充）就把这个Bean存入该缓存中
+	 * 也就是实例化但未初始化的bean放入该缓存里
+	 * 第二级缓存
+	 * */
 	private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
 
 	/** Set of registered singletons, containing the bean names in registration order. */
@@ -224,6 +236,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				// 在单例对象创建前先做一个标记
+				// 将beanName放入到singletonsCurrentlyInCreation这个集合中
+				// 标志着这个单例Bean正在创建
+				// 如果同一个单例Bean多次被创建，这里会抛出异常
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -231,6 +247,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					// 上游传入的lambda在这里会被执行，调用createBean方法创建一个Bean后返回
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
@@ -254,9 +271,11 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
+					// 创建完成后将对应的beanName从singletonsCurrentlyInCreation移除
 					afterSingletonCreation(beanName);
 				}
 				if (newSingleton) {
+					// 添加到一级缓存singletonObjects中
 					addSingleton(beanName, singletonObject);
 				}
 			}
